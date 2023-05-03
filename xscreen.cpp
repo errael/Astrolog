@@ -558,11 +558,7 @@ void CommandLineX()
   is.fSzInteract = fFalse;
   us.fLoop = fT;
   ciMain = ciCore;
-#ifndef WCLI
-  BeginX();
-#else
   InitColorsX();
-#endif
 }
 #endif // WIN
 
