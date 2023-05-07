@@ -62,7 +62,7 @@
 */
 
 #ifdef X11
-#include  <unistd.h>
+#include <unistd.h>
 #include <X11/Xatom.h>
 
 // This information used to define Astrolog's X icon (ringed planet with
@@ -818,7 +818,7 @@ void InteractX()
       if (!us.fExpOff && FSzSet(us.szExpDisp3))
         ParseExpression(us.szExpDisp3);
 #endif
-    } // if
+    } // if (fRedraw && (!gi.fPause || gs.nAnim))
 
     // Now process what's on the event queue, i.e. any keys pressed, etc.
 
@@ -1258,18 +1258,19 @@ void InteractX()
               break;
             }
             putchar(chBell);    // Any key not bound will sound a beep.
-          } // switch
-        } // if
+          } // switch (key)
+#ifdef WCLI
+        } // if(nMsg != WM_CHAR && nMsg != WM_KEYDOWN) else
+    } // if(PeekMessage())
+#endif
 #ifdef X11
+        } // case KeyPress: ... if(length == 1)
       default:
         ;
-      } // switch
-    } // if
+      } // switch(xevent.type)
+    } // if(XEventsQueued(...)...)
 #endif
-#ifdef WCLI
-    } // if
-#endif
-  } // while
+  } // while(!fBreak)
 }
 
 
