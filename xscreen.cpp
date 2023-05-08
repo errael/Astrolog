@@ -63,6 +63,7 @@
 
 #ifdef X11
 #include <unistd.h>
+#include <sys/time.h>
 #include <X11/Xatom.h>
 
 // This information used to define Astrolog's X icon (ringed planet with
@@ -92,6 +93,13 @@ CONST uchar icon_bits[] = {
   0x00,0xf8,0x79,0x00,0x00,0x00,0x00,0xf0,0x7f,0x00,0x00,0x20,0x00,0xc0,0xff,
   0x00,0x00,0x00,0x00,0x82,0xff,0x00,0x00,0x00,0x00,0x00,0xfe,0x40,0x00,0x00,
   0x00,0x00,0x70};
+
+#ifdef XSELTIME
+// would be nice to use timeradd(3)
+#define MSEC_SEC     1000
+#define USEC_SEC  1000000
+#define USEC_MSEC    1000
+#endif
 #endif
 
 
@@ -559,6 +567,7 @@ void CommandLineX()
   us.fLoop = fT;
   ciMain = ciCore;
   InitColorsX();
+  logit("Processed command line: %s", szCommandLine);
 }
 #endif // WIN
 
@@ -635,6 +644,8 @@ void InteractX()
   char sz[cchSzDef];
   XEvent xevent;
   KeySym keysym;
+  gi.nTimerDelay = 333; // Initialize 1/3 second for testing
+  gi.x11_fd = ConnectionNumber(gi.disp);
 #endif
 #ifdef WCLI
   HBITMAP hbmp, hbmpOld;
@@ -650,6 +661,8 @@ void InteractX()
 
   neg(gs.nAnim);
   while (!fBreak) {
+    static int nLoop = 0;
+    logit("InteractX: %d", ++nLoop);
     gi.nScale = gs.nScale/100;
     gi.nScaleText = gs.nScaleText/50;
 #ifdef WCLI
@@ -823,9 +836,37 @@ void InteractX()
     // Now process what's on the event queue, i.e. any keys pressed, etc.
 
 #ifdef X11
-    if (XEventsQueued(gi.disp, QueuedAfterFlush /*QueuedAfterReading*/) ||
-      !gs.nAnim || gi.fPause) {
+    logit("Check event queue: gs.nAnim %d, gi.fPause %d", gs.nAnim, gi.fPause);
+#ifdef XSELTIME
+    if(!XEventsQueued(gi.disp, QueuedAfterFlush)) {
+        // wait for next X event, with timeout if animating
+        logit("Select event queue");
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(gi.x11_fd, &readfds);
+        struct timeval *p_tv = nullptr; // assume not animating
+        struct timeval tv;
+        if(gs.nAnim && !gi.fPause) {
+            // Calculate the next timeout for animation.
+            // TODO: adjust time so that average timeout is specified time.
+            tv.tv_sec = gi.nTimerDelay / MSEC_SEC;
+            tv.tv_usec = (gi.nTimerDelay % MSEC_SEC) * USEC_MSEC;
+            p_tv = &tv;
+        }
+        int n_ready = select(gi.x11_fd + 1, &readfds, nullptr, nullptr, p_tv);
+        if(n_ready == 0) {
+            // no-events/timeout, let the animation step happen.
+            logit("Do animation step");
+            continue;
+        }
+    }
+#else
+    if (XEventsQueued(gi.disp, QueuedAfterFlush /*QueuedAfterReading*/)
+        || !gs.nAnim || gi.fPause)
+#endif
+    {
       XNextEvent(gi.disp, &xevent);
+      logit("XEvent: %d", xevent.type);
 
       // Restore what's on window if a part of it gets uncovered.
       if (xevent.type == Expose && xevent.xexpose.count == 0) {

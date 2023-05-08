@@ -52,6 +52,7 @@
 */
 
 #include "astrolog.h"
+#include "stdarg.h"
 
 
 /*
@@ -1289,6 +1290,15 @@ void PrintSzFormat(CONST char *sz, flag fPopup)
   PrintSz(szFormat);
 }
 
+
+void logit(const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
+    fprintf(stderr, "\n");
+}
 
 // Print a partial progress message given a string. This is meant to be used
 // in the middle of long operations such as creating and saving files.

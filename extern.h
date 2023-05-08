@@ -367,6 +367,7 @@ extern void Assert P((flag));
 #define Assert(f)
 #endif
 extern void Terminate P((int));
+extern void logit(const char *, ...);
 
 
 // From io.cpp

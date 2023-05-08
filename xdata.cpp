@@ -95,6 +95,9 @@ GI gi = {
 #endif
 #ifdef X11
   NULL, 0, 0, 0, 0, 0, 0, 0, 0,
+#ifdef XSELTIME
+  0, 0, 0,
+#endif
 #ifdef XCAIRO
   NULL,
 #endif

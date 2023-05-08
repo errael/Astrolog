@@ -73,6 +73,10 @@
                /* or if you don't want to use the X cairo library to      */
                /* to use and display "Astrology fonts". And see Makefile. */
 
+#define XSELTIME /* Comment out this #define if you don't have X windows, */
+                 /* or if you don't want to use OS select timeout for     */
+                 /* for animation delay.                                  */
+
 //#define WIN /* Comment out this #define if you don't have MS Windows, or */
             /* else have them but want a command line version instead.   */
 
@@ -330,6 +334,10 @@
 #define ISG
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#ifdef XSELTIME
+#include <sys/select.h>
+#include <cstdint>
+#endif
 #ifdef XCAIRO
 #include <cairo/cairo-xlib.h>
 #endif
@@ -402,6 +410,12 @@
 #error "If 'X11' is defined 'PC' must not be as well"
 #endif
 #endif // X11
+
+#ifdef XSELTIME
+#ifndef X11
+#error "If 'XSELTIME' is defined 'X11' must be too"
+#endif
+#endif // XSELTIME
 
 #ifdef XCAIRO
 #ifndef X11
@@ -1425,6 +1439,7 @@ enum _terminationcode {
 #endif // GRAPH
 
 
+
 /*
 ******************************************************************************
 ** Type Definitions.
@@ -2081,6 +2096,11 @@ typedef struct _GraphicsInternal {
   Window wind, root;
   int screen;
   int depth;          // Number of active color bits.
+#ifdef XSELTIME
+  uint nTimerDelay;   // Milliseconds between animation draws.
+  uint64_t nNextTime; // TODO: Target time for next animation step.
+  int x11_fd;         // FD of the x11 display for use with select.
+#endif
 #ifdef XCAIRO
   cairo_t *cr;        // For drawing astrology font characters on X windows.
 #endif
