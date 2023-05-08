@@ -2096,6 +2096,7 @@ typedef struct _GraphicsInternal {
   Window wind, root;
   int screen;
   int depth;          // Number of active color bits.
+  int initx, inity;   // Initial x/y window position if initx not -1.
 #ifdef XSELTIME
   uint nTimerDelay;   // Milliseconds between animation draws.
   uint64_t nNextTime; // TODO: Target time for next animation step.

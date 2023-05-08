@@ -644,8 +644,11 @@ void InteractX()
   char sz[cchSzDef];
   XEvent xevent;
   KeySym keysym;
-  gi.nTimerDelay = 333; // Initialize 1/3 second for testing
   gi.x11_fd = ConnectionNumber(gi.disp);
+  if(gi.initx != -1) {
+    XMoveWindow(gi.disp, gi.wind, gi.initx, gi.inity);
+    gi.initx = -1;
+  }
 #endif
 #ifdef WCLI
   HBITMAP hbmp, hbmpOld;
@@ -1778,6 +1781,53 @@ int NProcessSwitchesX(int argc, char **argv, int pos,
   // 'darg' contains the value to be added to argc after returning.
   return darg;
 }
+
+#ifdef X11
+// X11 supports a few of the WIN Options
+int NProcessSwitchesW(int argc, char **argv, int pos,
+  flag fOr, flag fAnd, flag fNot)
+{
+  int darg = 0, xo, yo, i;
+  char sz[cchSzMax], ch1, ch2;
+
+  ch1 = argv[0][pos+1];
+  ch2 = ch1 != chNull ? argv[0][pos+2] : chNull;
+  switch (argv[0][pos]) {
+
+#ifdef XSELTIME
+  case 'N':
+    if (FErrorArgc("WN", argc, 1))
+      return tcError;
+    i = NFromSz(argv[1]);
+    if (FErrorValN("WN", !FValidTimer(i), i, 0))
+      return tcError;
+    gi.nTimerDelay = i;
+    darg++;
+    break;
+#endif
+
+  case 'w':
+    if (FErrorArgc("Ww", argc, 2))
+      return tcError;
+    xo = NFromSz(argv[1]);
+    yo = NFromSz(argv[2]);
+    if(gi.disp != nullptr)
+      XMoveWindow(gi.disp, gi.wind, xo, yo);
+    else {
+      gi.initx = xo;
+      gi.inity = yo;
+    }
+    darg += 2;
+    break;
+
+  default:
+    ErrorSwitch(argv[0]);
+    return tcError;
+  }
+  // 'darg' contains the value to be added to argc when we return.
+  return darg;
+}
+#endif
 
 
 // Process one command line switch passed to the program dealing with more

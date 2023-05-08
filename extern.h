@@ -980,6 +980,9 @@ extern int NProcessSwitchesRareX P((int, char **, int, flag, flag, flag));
 extern int DetectGraphicsChartMode P((void));
 extern flag FActionX P((void));
 #endif // GRAPH
+#ifdef X11
+extern int NProcessSwitchesW P((int, char **, int, flag, flag, flag));
+#endif
 
 
 #ifdef WIN
