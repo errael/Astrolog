@@ -571,6 +571,9 @@
 #define chSep    ','
 #define chSep2   ';'
 
+#define funcKeyFirst 201 // 0xc9
+#define funcKeyLast  248 // 0xf8
+
 // Array index limits
 
 #define objMax    (cObj+1)

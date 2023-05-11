@@ -33,8 +33,10 @@ XCAIRO = -lcairo -lfontconfig
 # If not compiling with GNUC, delete the "-ldl" part from the line below:
 LIBS = -lm -lX11 -ldl $(XCAIRO)
 
-OPT = -O2 -s
+#OPT = -O2 -s
+OPT = -g -O2 -s
 #OPT = -g -O0
+#OPT = -g -Og
 WARN = -Wno-write-strings -Wno-narrowing -Wno-comment \
        -Wno-register
 

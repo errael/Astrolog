@@ -567,7 +567,7 @@ void CommandLineX()
   us.fLoop = fT;
   ciMain = ciCore;
   InitColorsX();
-  logit("Processed command line: %s", szCommandLine);
+  //logit("Processed command line: %s", szCommandLine);
 }
 #endif // WIN
 
@@ -664,8 +664,8 @@ void InteractX()
 
   neg(gs.nAnim);
   while (!fBreak) {
-    static int nLoop = 0;
-    logit("InteractX: %d", ++nLoop);
+    //static int nLoop = 0;
+    //logit("InteractX: %d", ++nLoop);
     gi.nScale = gs.nScale/100;
     gi.nScaleText = gs.nScaleText/50;
 #ifdef WCLI
@@ -839,11 +839,11 @@ void InteractX()
     // Now process what's on the event queue, i.e. any keys pressed, etc.
 
 #ifdef X11
-    logit("Check event queue: gs.nAnim %d, gi.fPause %d", gs.nAnim, gi.fPause);
+    //logit("Check event queue: gs.nAnim %d, gi.fPause %d", gs.nAnim, gi.fPause);
 #ifdef XSELTIME
     if(!XEventsQueued(gi.disp, QueuedAfterFlush)) {
         // wait for next X event, with timeout if animating
-        logit("Select event queue");
+        //logit("Select event queue");
         fd_set readfds;
         FD_ZERO(&readfds);
         FD_SET(gi.x11_fd, &readfds);
@@ -859,7 +859,7 @@ void InteractX()
         int n_ready = select(gi.x11_fd + 1, &readfds, nullptr, nullptr, p_tv);
         if(n_ready == 0) {
             // no-events/timeout, let the animation step happen.
-            logit("Do animation step");
+            //logit("Do animation step");
             continue;
         }
     }
@@ -869,7 +869,7 @@ void InteractX()
 #endif
     {
       XNextEvent(gi.disp, &xevent);
-      logit("XEvent: %d", xevent.type);
+      //logit("XEvent: %d", xevent.type);
 
       // Restore what's on window if a part of it gets uncovered.
       if (xevent.type == Expose && xevent.xexpose.count == 0) {
@@ -924,9 +924,29 @@ void InteractX()
 
       // Process any keys user pressed in window.
       case KeyPress:
-        length = XLookupString((XKeyEvent *)&xevent, xkey, 10, &keysym, 0);
-        if (length == 1) {
-          key = xkey[0];
+        {
+          XKeyEvent *kev = (XKeyEvent *)&xevent;
+          length = XLookupString(kev, xkey, 10, &keysym, NULL);
+          key = length == 1 ? xkey[0] : keysym;
+          //logit("KeyPress: key %x: '%c' (0x%x),"
+          //      " sym: '%s' (0x%08x), state: 0x%x, len: %d",
+          //      key, xkey[0] >= ' ' ? xkey[0] : 0, xkey[0],
+          //      XKeysymToString(keysym), keysym, kev->state, length);
+          if(FBetween(key, XK_F1, XK_F12)) {
+              // Put key in range funcKeyFirst:funcKeyLast inclusive.
+              // Account for shift(+12)/control(+24)/alt(+36).
+              int fkey = key - XK_F1;
+              if((kev->state & ShiftMask) != 0)
+                  fkey += 12;
+              else if((kev->state & ControlMask) != 0)
+                  fkey += 24;
+              else if((kev->state & Mod1Mask) != 0)
+                  fkey += 36;
+              key = funcKeyFirst + fkey;
+              logit("MapFuncKey: fkey %d, key %d", fkey, key);
+          }
+        }
+        if (!IsModifierKey(keysym)) {
 #endif // X11
 
 #ifdef WCLI
@@ -1265,7 +1285,11 @@ void InteractX()
             CommandLineX();
             fResize = fCast = fTrue;
             break;
+#ifdef X11
+          case 0x7f:
+#else
           case chDelete:
+#endif
             fRedraw = fNoChart = fTrue;
             break;
           case 'z'-'`': coldrw = kBlack;   break;
@@ -1292,23 +1316,29 @@ void InteractX()
               // Process numbers 1-9 signifying animation rate.
               gi.nDir = (gi.nDir > 0 ? 1 : -1)*(key-'0');
               break;
-            } else if (FBetween(key, 201, 248)) {
-              is.fSzInteract = fTrue;
-              if (szMacro[key-201]) {
-                FProcessCommandLine(szMacro[key-201]);
+            } else if (FBetween(key, funcKeyFirst, funcKeyLast)) {
+              if (szMacro[key-funcKeyFirst]) {
+                is.fSzInteract = fTrue;
+                FProcessCommandLine(szMacro[key-funcKeyFirst]);
                 fResize = fCast = fTrue;
+                is.fSzInteract = fFalse;
+                break;
               }
-              is.fSzInteract = fFalse;
-              break;
             }
-            putchar(chBell);    // Any key not bound will sound a beep.
+            // Any key not bound, or empty macro, will sound a beep.
+#ifdef X11
+            XBell(gi.disp, 0);
+#endif
+#ifdef WCLI
+            putchar(chBell);
+#endif
           } // switch (key)
 #ifdef WCLI
         } // if(nMsg != WM_CHAR && nMsg != WM_KEYDOWN) else
     } // if(PeekMessage())
 #endif
 #ifdef X11
-        } // case KeyPress: ... if(length == 1)
+        } // case KeyPress: ... if(!IsModifier(keysym))
       default:
         ;
       } // switch(xevent.type)

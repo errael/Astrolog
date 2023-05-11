@@ -432,7 +432,8 @@ flag DrawGlyph(int ch, int x, int y, int fi, int nScale)
   cairo_font_face_reference(fontPrev);
   cairo_select_font_face (gi.cr, rgszFontName[fi],
                           CAIRO_FONT_SLANT_NORMAL,
-                          CAIRO_FONT_WEIGHT_NORMAL);
+                          gs.fThick ? CAIRO_FONT_WEIGHT_BOLD
+                              : CAIRO_FONT_WEIGHT_NORMAL);
   cairo_set_font_size(gi.cr, 12*gi.nScale*nScale/100); // height
   double r,g,b,a;
   cairo_pattern_get_rgba(cairo_get_source(gi.cr), &r, &g, &b, &a);
@@ -485,10 +486,12 @@ static void initFontAvail()
         if(!(fcb || fcr))
             font_avail[i] = strcmp(rgszFontName[i], (char*)family) == 0;
     }
-    for(i = 0; i < cFont; i++)
-        fprintf(stderr, "font %d: %d - '%s'\n",
-                i, font_avail[i], rgszFontName[i]);
-
+    // TODO: option to display available fonts
+    if(false) {
+        for(i = 0; i < cFont; i++)
+            fprintf(stderr, "font %d: %d - '%s'\n",
+                    i, font_avail[i], rgszFontName[i]);
+    }
 }
 
 flag FFontInstalled(int fi)
