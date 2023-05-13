@@ -61,6 +61,7 @@
 ******************************************************************************
 */
 
+#include <string.h>
 #ifdef X11
 #include <unistd.h>
 #include <sys/time.h>
@@ -534,13 +535,32 @@ LNotNow:
     CastChart(0);
 }
 
-
 #ifndef WIN
+// TODO: fPause is NOT USED
+
+static void finishCommandLineX(int, char *[], int, int);
+
+// Treats a macro like a commandLine for processing.
+// TODO: use malloc rather than char array on stack?
+static void ProcessMacro(char *macro)
+{
+  char szCommandLine[cchSzMax], *rgsz[MAXSWITCHES];
+  int argc, fT, fPause = fFalse;
+
+  if(strlen(macro) + 1 > sizeof(szCommandLine))
+    return;
+  strcpy(szCommandLine, macro);
+
+  ciCore = ciMain;
+  fT = us.fLoop; us.fLoop = fTrue;
+  argc = NParseCommandLine(szCommandLine, rgsz);
+  finishCommandLineX(argc, rgsz, fT, fPause);
+}
+
 // This routine exits graphics mode, prompts the user for a set of command
 // switches, processes them, and returns to the previous graphics with the
 // new settings in effect, allowing one to change most any setting without
 // having to lose their graphics state or fall way back to a -Q loop.
-
 void CommandLineX()
 {
   char szCommandLine[cchSzMax], *rgsz[MAXSWITCHES];
@@ -549,9 +569,16 @@ void CommandLineX()
   ciCore = ciMain;
   fT = us.fLoop; us.fLoop = fTrue;
   argc = NPromptSwitches(szCommandLine, rgsz);
+  finishCommandLineX(argc, rgsz, fT, fPause);
+}
+
+// For input line or macro
+static void finishCommandLineX(int argc, char *argv[MAXSWITCHES],
+                               int fT, int fPause)
+{
   is.cchRow = 0;
   is.fSzInteract = fTrue;
-  if (!FProcessSwitches(argc, rgsz))
+  if (!FProcessSwitches(argc, argv))
     fPause = fTrue;
   else {
     is.fMult = fFalse;
@@ -567,7 +594,6 @@ void CommandLineX()
   us.fLoop = fT;
   ciMain = ciCore;
   InitColorsX();
-  //logit("Processed command line: %s", szCommandLine);
 }
 #endif // WIN
 
@@ -943,7 +969,7 @@ void InteractX()
               else if((kev->state & Mod1Mask) != 0)
                   fkey += 36;
               key = funcKeyFirst + fkey;
-              logit("MapFuncKey: fkey %d, key %d", fkey, key);
+              //logit("MapFuncKey: fkey %d, key %d", fkey, key);
           }
         }
         if (!IsModifierKey(keysym)) {
@@ -1318,10 +1344,8 @@ void InteractX()
               break;
             } else if (FBetween(key, funcKeyFirst, funcKeyLast)) {
               if (szMacro[key-funcKeyFirst]) {
-                is.fSzInteract = fTrue;
-                FProcessCommandLine(szMacro[key-funcKeyFirst]);
+                ProcessMacro(szMacro[key-funcKeyFirst]);
                 fResize = fCast = fTrue;
-                is.fSzInteract = fFalse;
                 break;
               }
             }
