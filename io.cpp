@@ -404,10 +404,10 @@ flag FOutputData(void)
   // Now write any extra strings that were on the command line after the -o
   // specification but before the next switch, to the file as comments.
 
-  for (i = 1; i < is.cszComment; i++) {
-    is.rgszComment++;
-    fprintf(file, "%s%s\n", us.fWriteOld ? "" : "; ", is.rgszComment[1]);
+  for (i = 0; i < is.cszComment; i++) {
+    fprintf(file, "%s%s\n", us.fWriteOld ? "" : "; ", is.rgszComment[i]);
   }
+  DeallocateChartComments();
   fclose(file);
   return fTrue;
 }

@@ -2371,6 +2371,49 @@ flag FEnumerateCIList(int nListAll)
 }
 
 
+// Allocate Comments to is.rgszComment
+// Comment is left empty if there's any allocation problem
+void AllocateChartComments(char **comments, int nComment)
+{
+  DeallocateChartComments(); // Just in case.
+  if (nComment == 0)
+    return;
+  is.rgszComment = (char**)PAllocate(nComment * sizeof(char *), "ChartComment");
+  if (is.rgszComment == NULL)
+    return;
+  ClearB((pbyte)is.rgszComment, nComment * sizeof(char *));
+  is.cszComment = nComment;
+  for (int i = 0; i < nComment; i++) {
+    if ((is.rgszComment[i] = SzCopy(comments[i])) == NULL) {
+      DeallocateChartComments();
+      return;
+    }
+#ifdef P_ALLOCATE_COPY
+    pbyte pb = PAllocateCopy(comments[i], CchSz(comments[i])+1, "ChartComment");
+    if ((is.rgszComment[i] = pb) == NULL) {
+      DeallocateChartComments();
+      return;
+    }
+#endif
+    is.cAlloc++; // SzPersist assumes forever, but it will be freed
+  }
+}
+
+
+// Deallocate comments. Can be called more often than required.
+void DeallocateChartComments()
+{
+  if (is.rgszComment == NULL)
+    return;
+  for (int i = 0; i < is.cszComment; i++)
+    if (is.rgszComment[i] != NULL)
+      DeallocateP(is.rgszComment[i]);
+  DeallocateP(is.rgszComment);
+  is.rgszComment = NULL;
+  is.cszComment = 0;
+}
+
+
 /*
 ******************************************************************************
 ** Character Encoding Procedures.
@@ -2663,6 +2706,19 @@ pbyte PAllocate(long cb, CONST char *szType)
   return pb;
 #endif
 }
+
+
+#ifdef P_ALLOCATE_COPY
+// Like PAllocate; in addition copy pbSrc into allocated buffer.
+
+pbyte PAllocateCopy(pbyte pbSrc, long cb, CONST char *szType)
+{
+    pbyte pb = PAllocate(cb, szType);
+    if (pb != NULL)
+        CopyRgb(pbSrc, pb, cb);
+    return pb;
+}
+#endif
 
 
 // Free a memory buffer allocated with PAllocate().

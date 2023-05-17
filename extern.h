@@ -346,6 +346,8 @@ extern flag FAppendCIList P((CONST CI *));
 extern flag FSortCIList P((int));
 extern void FilterCIList P((CONST char *, CONST char *));
 extern flag FEnumerateCIList P((int));
+extern void AllocateChartComments P((char **, int));
+extern void DeallocateChartComments();
 extern int UTF8ToWch P((CONST uchar *, wchar *));
 extern int WchToUTF8 P((wchar, char *));
 extern wchar WchFromChLatin P((uchar));

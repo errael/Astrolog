@@ -2081,12 +2081,15 @@ flag FProcessSwitches(int argc, char **argv)
         us.nWriteFormat = FSwitchF2(us.nWriteFormat == ch1) * ch1;
       SwitchF(us.fWriteFile);
       is.szFileOut = SzPersist(argv[1]);
-      if (is.fSzPersist) {
-        is.rgszComment = argv;
+      // save and skip option strings
+      {
+        char **rgszComment = &argv[2];
+        int cszComment = 0;
         do {
           argc--; argv++;
-          is.cszComment++;
+          cszComment++;
         } while (argc > 1 && !FChSwitch(argv[1][0]));
+        AllocateChartComments(rgszComment, cszComment - 1);
       }
       break;
 

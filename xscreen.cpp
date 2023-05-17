@@ -808,6 +808,10 @@ void InteractX()
     }
     if (gs.nAnim && !gi.fPause)
       fRedraw = fTrue;
+    if (us.fWriteFile) {
+        FOutputData();
+        us.fWriteFile = fFalse;
+    }
 
     // Update the screen if anything has changed since last time around.
 
@@ -2441,7 +2445,19 @@ flag FActionX()
     } else
 #endif
 #ifndef WIN
+    {
+      // Keep "-o" option for exit (cleaner to just ignore if GRAPH?)
+      flag fWriteFile = us.fWriteFile;
+      flag nWriteFormat = us.nWriteFormat;
+      char *szFileOut = is.szFileOut;
+      us.fWriteFile = 0;
+      us.nWriteFormat = 0;
+      is.szFileOut = NULL;
       InteractX();    // Window's up; process commands given to window now.
+      us.fWriteFile = fWriteFile;
+      us.nWriteFormat = nWriteFormat;
+      is.szFileOut = szFileOut;
+    }
     EndX();
 #else
     DrawChartX();
