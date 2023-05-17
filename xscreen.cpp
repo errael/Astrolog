@@ -101,6 +101,11 @@ CONST uchar icon_bits[] = {
 #define USEC_SEC  1000000
 #define USEC_MSEC    1000
 #endif
+
+#define SC (ShiftMask|ControlMask)
+#define AsSC(c) ((SC << 24) | ((c) & 0xffffff))
+
+inline const char *xEventType(unsigned int et);
 #endif
 
 
@@ -895,7 +900,7 @@ void InteractX()
 #endif
     {
       XNextEvent(gi.disp, &xevent);
-      //logit("XEvent: %d", xevent.type);
+      //logit("XEvent: %s:%d", xEventType(xevent.type), xevent.type);
 
       // Restore what's on window if a part of it gets uncovered.
       if (xevent.type == Expose && xevent.xexpose.count == 0) {
@@ -959,17 +964,26 @@ void InteractX()
           //      key, xkey[0] >= ' ' ? xkey[0] : 0, xkey[0],
           //      XKeysymToString(keysym), keysym, kev->state, length);
           if(FBetween(key, XK_F1, XK_F12)) {
-              // Put key in range funcKeyFirst:funcKeyLast inclusive.
-              // Account for shift(+12)/control(+24)/alt(+36).
-              int fkey = key - XK_F1;
+            // Put key in range funcKeyFirst:funcKeyLast inclusive.
+            // Account for shift(+12)/control(+24)/alt(+36).
+            int fkey = key - XK_F1;
+            //  If both Shift and Control, then treat it like Alt
+            if((kev->state & SC) == SC) {
+              fkey += 36;
+            } else {
               if((kev->state & ShiftMask) != 0)
-                  fkey += 12;
+                fkey += 12;
               else if((kev->state & ControlMask) != 0)
-                  fkey += 24;
+                fkey += 24;
               else if((kev->state & Mod1Mask) != 0)
-                  fkey += 36;
-              key = funcKeyFirst + fkey;
-              //logit("MapFuncKey: fkey %d, key %d", fkey, key);
+                fkey += 36;
+            }
+            key = funcKeyFirst + fkey;
+            //logit("MapFuncKey: fkey %d, key %d", fkey, key);
+          } else {
+            if((kev->state & SC) == SC) {
+              key = AsSC(keysym);
+            }
           }
         }
         if (!IsModifierKey(keysym)) {
@@ -1298,12 +1312,9 @@ void InteractX()
             length = us.nScrollRow;
             us.nScrollRow = 0;
             PrintL();
-            if (key == 'v') {
-              if (us.nRel < rcNone)
-                ChartListingRelation();
-              else
-                ChartListing();
-            } else
+            if (key == 'v')
+              PrintChart(is.fProgress);
+            else
               DisplayKeysX();
             us.nScrollRow = length;
             break;
@@ -2439,6 +2450,53 @@ flag FActionX()
 #endif // ISG
   return fTrue;
 }
+
+#ifdef X11
+const char *xEventTypes[] {
+  "xEventType-0",
+  "xEventType-1",
+  "KeyPress",		// 2
+  "KeyRelease",		// 3
+  "ButtonPress",	// 4
+  "ButtonRelease",	// 5
+  "MotionNotify",	// 6
+  "EnterNotify",	// 7
+  "LeaveNotify",	// 8
+  "FocusIn",		// 9
+  "FocusOut",		// 10
+  "KeymapNotify",	// 11
+  "Expose",		// 12
+  "GraphicsExpose",	// 13
+  "NoExpose",		// 14
+  "VisibilityNotify",	// 15
+  "CreateNotify",	// 16
+  "DestroyNotify",	// 17
+  "UnmapNotify",	// 18
+  "MapNotify",		// 19
+  "MapRequest",		// 20
+  "ReparentNotify",	// 21
+  "ConfigureNotify",	// 22
+  "ConfigureRequest",	// 23
+  "GravityNotify",	// 24
+  "ResizeRequest",	// 25
+  "CirculateNotify",	// 26
+  "CirculateRequest",	// 27
+  "PropertyNotify",	// 28
+  "SelectionClear",	// 29
+  "SelectionRequest",	// 30
+  "SelectionNotify",	// 31
+  "ColormapNotify",	// 32
+  "ClientMessage",	// 33
+  "MappingNotify",	// 34
+  "GenericEvent"	// 35
+};
+
+inline const char *xEventType(unsigned int et)
+{
+    return et < LASTEvent ? xEventTypes[et] : "oob";
+}
+#endif // X11
+
 #endif // GRAPH
 
 /* xscreen.cpp */
