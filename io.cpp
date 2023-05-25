@@ -228,6 +228,7 @@ dword LRead(FILE *file)
 
 flag FProcessSwitchFile(CONST char *szFile, FILE *file)
 {
+  // TODO: dynamic allocation for szLine
   char szLine[cchSzLine], *argv[MAXSWITCHES], ch;
   int argc, i;
   flag fHaveFile, fRet = fFalse;
@@ -249,23 +250,77 @@ flag FProcessSwitchFile(CONST char *szFile, FILE *file)
     PrintWarning(szLine);
     goto LDone;
   }
+
+  // Line Continuation states;
+  // states other than IDLE are active for a single char.
+  // IDLE: usual state, if backslash enter state CHECK_CRNL.
+#       define LINE_CONT_IDLE          0
+  // CHECK_CRNL: After backslash, look for CR or NL.
+  // If NL found then do continuation; enter state IDLE.
+  // If CR then, enter state AFTER_CR.
+  // Otherwise enter state IDLE.
+#       define LINE_CONT_CHECK_CRNL    1
+  // AFTER_CR: Doing continuation after CR; NL following CR is windows, else MAC.
+  // Enter state IDLE
+#       define LINE_CONT_AFTER_CR      2
+
+#define IS_CRNL(c) ((c) == '\n' || (c) == '\r')
+
   loop {
     while (!feof(file) && (ch = getbyte()) < ' ')
       ;
     if (feof(file))
       break;
+    int ichBackslash = -1; // Index of '\' in szLine, if any.
+    int stateLC = LINE_CONT_IDLE;
     for (szLine[0] = ch, i = 1; i < cchSzLine-1 && !feof(file); i++) {
+      if (ch == '\\') {
+        ichBackslash = i - 1;
+        stateLC = LINE_CONT_CHECK_CRNL;
+      }
+
       ch = getbyte();
-      if (!((uchar)ch >= ' ' || ch == chTab))
-        break;
       szLine[i] = ch;
-    }
-    if (ch != '\n')
+
+      // if control char then done with line, unless '\' processing
+      if (!((uchar)ch >= ' ' || ch == chTab)
+          || stateLC == LINE_CONT_AFTER_CR) {
+        if (stateLC == LINE_CONT_CHECK_CRNL && ch == '\n'
+            || stateLC == LINE_CONT_AFTER_CR) {
+          // Doing line continuation, set up to append next line to current
+          i = ichBackslash -1;  // forget characters like "\\\n" or "\\\r\n"
+          if (ch != '\n')       // NL is end of both linux/dos sequences
+            ungetc(ch, file);   // MAC CR, saw CR not followed by NL
+          ch = 0;               // avoid checking char already accepted
+        } else {
+          if (stateLC == LINE_CONT_IDLE
+              || stateLC == LINE_CONT_CHECK_CRNL && !IS_CRNL(ch))
+            break; // end of line, process the collected line
+          stateLC = LINE_CONT_AFTER_CR; // check for following NL
+          continue;
+        }
+      }
+      ichBackslash = -1;
+      stateLC = LINE_CONT_IDLE;
+    } // for(...) - read characters in current line
+
+    // NOT SURE WHAT THIS CHECK IS ABOUT. I'm guessing...
+    // If got CR, then maybe windows. Check for NL after CR
+    // TODO: just get rid of this check? If there's an extra char,
+    // like NL after CR, but that would be an extra loop
+    // But "if('\b') getbyte()" by itself fails classic MAC
+    if (ch != '\n') {
       ch = getbyte();
+      if ((uchar)ch != 255 && ch != '\n')
+        ungetc(ch, file); // didn't find a NL after CR
+    }
+
+    // TODO: fix following comment, 255 is EOF/-1 as a char isn't it?
     // Windows Notepad files sometimes have character 255 at end of file.
     if (i > 0 && (uchar)szLine[i-1] == 255)
       i--;
     szLine[i] = chNull;
+    //logit("InputLine: '%s' (%d chars)", szLine, i);
     argc = NParseCommandLine(szLine, argv);
     if (!FProcessSwitches(argc, argv))
       goto LDone;
