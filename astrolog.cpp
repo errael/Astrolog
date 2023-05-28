@@ -1284,13 +1284,14 @@ flag FProcessSwitches(int argc, char **argv)
       if (FErrorArgc("M", argc, 1+i))
         return fFalse;
       j = NFromSz(argv[1]);
-      if (FErrorValN("M", !FValidMacro(j), j, 1))
-        return fFalse;
       j--;
-      if (i)
-        szMacro[j] = SzPersist(argv[2]);
-      else
+      if (i && j >= 0)
+        SetMacro(j, argv[2]);
+      else {
+        if (FErrorValN("M", !FValidSlotMacro(j+1), j, 1))
+          return fFalse;
         FProcessCommandLine(szMacro[j]);
+      }
       argc -= 1+i; argv += 1+i;
       break;
 
@@ -3002,6 +3003,7 @@ void FinalizeProgram(flag fSkip)
   if (ofn.lpstrFile != NULL && ofn.lpstrFile != szFileName)
     DeallocateP(ofn.lpstrFile);
 #endif
+  DeallocateMacros();
   if (!fSkip && is.cAlloc != 0) {
     sprintf(sz, "Number of memory allocations not freed before exiting: %d",
       is.cAlloc);

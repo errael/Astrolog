@@ -189,7 +189,8 @@ CP * CONST rgpcp[cRing+1] = {&cp0, &cp1, &cp2, &cp3, &cp4, &cp5, &cp6};
 real force[objMax];
 GridInfo *grid = NULL;
 int rgobjList[objMax], rgobjList2[objMax], starname[cStar+1], kObjA[objMax];
-char *szMacro[48], *szWheel[cRing+1] = {"", "", "", "", "", "", ""};
+char **szMacro, *szWheel[cRing+1] = {"", "", "", "", "", "", ""};
+int cszMacro;
 real rStarBrightDef[cStar+1] = {-1.0}, rStarBright[cStar+1],
   rStarBrightDistDef[cStar+1];
 char *szStarCustom[cStar+1];

@@ -97,7 +97,7 @@ int NProcessSwitchesW(int argc, char **argv, int pos,
     if (FErrorArgc("WM", argc, 2))
       return tcError;
     i = NFromSz(argv[1]);
-    if (FErrorValN("WM", !FValidMacro(i), i, 1))
+    if (FErrorValN("WM", !FValidMenuMacro(i), i, 1))
       return tcError;
     i--;
     sprintf(sz, "%s\t%sF%d", argv[2], i < 12 ? "" : (i < 24 ? "Shift+" :

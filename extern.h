@@ -224,7 +224,8 @@ extern CONST int cSatellite[oPlu+1], nMooMap[6][8], rgobjHasMoons[cHasMoons];
 
 extern CONST AI ai[cPart];
 
-extern char *szMacro[48], *szWheel[cRing+1];
+extern char **szMacro, *szWheel[cRing+1];
+extern int cszMacro;
 extern CONST char *szColor[cColor+4], *szColorHTML[cColor];
 
 extern int rgObjRay[oNorm+1], rgSignRay[cSign+1], rgSignRay2[cSign+1][cRay+1],
@@ -346,6 +347,8 @@ extern flag FAppendCIList P((CONST CI *));
 extern flag FSortCIList P((int));
 extern void FilterCIList P((CONST char *, CONST char *));
 extern flag FEnumerateCIList P((int));
+extern flag SetMacro P((int, char*));
+extern void DeallocateMacros();
 extern void AllocateChartComments P((char **, int));
 extern void DeallocateChartComments();
 extern int UTF8ToWch P((CONST uchar *, wchar *));

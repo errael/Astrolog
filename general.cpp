@@ -54,6 +54,10 @@
 #include "astrolog.h"
 #include "stdarg.h"
 
+// TODO: get rid of P_ALLOCATE_COPY, either use it or don't use it
+#define P_ALLOCATE_COPY
+pbyte PAllocateCopy(pbyte, long cb, CONST char *);
+flag FEnsureSlotSz(int, char ***, int *, int, CONST char *);
 
 /*
 ******************************************************************************
@@ -2384,18 +2388,19 @@ void AllocateChartComments(char **comments, int nComment)
   ClearB((pbyte)is.rgszComment, nComment * sizeof(char *));
   is.cszComment = nComment;
   for (int i = 0; i < nComment; i++) {
+#ifdef P_ALLOCATE_COPY
+    pbyte pb = PAllocateCopy((pbyte)comments[i], CchSz(comments[i])+1, "ChartComment");
+    if ((is.rgszComment[i] = (char*)pb) == NULL) {
+      DeallocateChartComments();
+      return;
+    }
+#else
     if ((is.rgszComment[i] = SzCopy(comments[i])) == NULL) {
       DeallocateChartComments();
       return;
     }
-#ifdef P_ALLOCATE_COPY
-    pbyte pb = PAllocateCopy(comments[i], CchSz(comments[i])+1, "ChartComment");
-    if ((is.rgszComment[i] = pb) == NULL) {
-      DeallocateChartComments();
-      return;
-    }
-#endif
     is.cAlloc++; // SzPersist assumes forever, but it will be freed
+#endif
   }
 }
 
@@ -2411,6 +2416,81 @@ void DeallocateChartComments()
   DeallocateP(is.rgszComment);
   is.rgszComment = NULL;
   is.cszComment = 0;
+}
+
+// TODO: use these Slot methods for ExpMacro,
+// TODO: if incorporated, use a struct for each slot range.
+//          struct {
+//              char **rgszSlots;
+//              int cszSlots;
+//              int cMinIndex;
+//              char *szType;
+//          }
+// Maintain a growable range of sz.
+// Add a new string at slot 'i'. Free any previous string in that slot.
+flag SetSlotSz(int i, char *sz, char ***prgsz, int *pcsz, int cMinIndex,
+               CONST char *szType)
+{
+  if (!FEnsureSlotSz(i + 1, prgsz, pcsz, cMinIndex, szType))
+      return fFalse;
+  char **rgsz = *prgsz;
+  if (rgsz[i] != NULL)
+    DeallocateP(rgsz[i]);
+#ifdef P_ALLOCATE_COPY
+  if ((rgsz[i] = (char*)PAllocateCopy((pbyte)sz, CchSz(sz)+1, szType)) == NULL)
+    return fFalse;
+#else
+  if ((rgsz[i] = SzCopy(sz)) == NULL)
+    return fFalse;
+  is.cAlloc++; // SzPersist assumes forever, but it will be freed
+#endif
+  return fTrue;
+}
+
+flag FEnsureSlotSz(int cszNew, char ***prgsz, int *pcsz, int cMinIndex,
+                   CONST char *szType)
+{
+  if (cszNew <= *pcsz)
+    return fTrue;
+
+  if (cszNew <= cMinIndex)
+    cszNew = cMinIndex + 1;
+  char **rgszT = (char **)RgReallocate(*prgsz, *pcsz,
+    sizeof(char *), cszNew, szType);
+  if (rgszT == NULL)
+    return fFalse;
+  if (*prgsz != NULL)
+    DeallocateP(*prgsz);
+  *prgsz = rgszT;
+  *pcsz = cszNew;
+  return fTrue;
+}
+
+// Deallocate any occupied slots, and the array itself.
+// Set values to NULL/0.
+void DeallocateSlots(char ***prgsz, int *pcsz)
+{
+  if (*pcsz == 0)
+    return;
+  int i;
+  char **psz = *prgsz;
+  for (i = *pcsz; i > 0; i--, psz++)
+    if (*psz != NULL)
+      DeallocateP(*psz);
+  DeallocateP(*prgsz);
+  *prgsz = NULL;
+  *pcsz = 0;
+}
+
+// Add a new macro at slot 'i'.
+flag SetMacro(int i, char *sz)
+{
+  return SetSlotSz(i, sz, &szMacro, &cszMacro, nMenuSlots - 1, "Macro Slots");
+}
+
+void DeallocateMacros()
+{
+  DeallocateSlots(&szMacro, &cszMacro);
 }
 
 

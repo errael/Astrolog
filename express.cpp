@@ -1812,7 +1812,7 @@ flag FEvalFunction(int ifun, PAR *rgpar, char *rgpchEval[2])
       n = 0;
     break;
   case funSwitch:
-    n = FValidMacro(n1) && FProcessCommandLine(szMacro[n1-1]);
+    n = FValidSlotMacro(n1) && FProcessCommandLine(szMacro[n1-1]);
     break;
   case funRndSeed:
     srand(n1);

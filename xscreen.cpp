@@ -1358,8 +1358,9 @@ void InteractX()
               gi.nDir = (gi.nDir > 0 ? 1 : -1)*(key-'0');
               break;
             } else if (FBetween(key, funcKeyFirst, funcKeyLast)) {
-              if (szMacro[key-funcKeyFirst]) {
-                ProcessMacro(szMacro[key-funcKeyFirst]);
+              int i = key-funcKeyFirst;
+              if (FValidSlotMacro(i+1) && szMacro[i] != NULL) {
+                ProcessMacro(szMacro[i]);
                 fResize = fCast = fTrue;
                 break;
               }

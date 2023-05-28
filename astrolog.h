@@ -574,6 +574,8 @@
 #define funcKeyFirst 201 // 0xc9
 #define funcKeyLast  248 // 0xf8
 
+#define nMenuSlots 48
+
 // Array index limits
 
 #define objMax    (cObj+1)
@@ -1293,7 +1295,8 @@ enum _terminationcode {
 #define FValidDwad(n) FBetween(n, 0, 12)
 #define FValidBioday(n) FBetween(n, 1, 199)
 #define FValidScreen(n) FBetween(n, 20, 200)
-#define FValidMacro(n) FBetween(n, 1, 48)
+#define FValidMenuMacro(n) FBetween(n, 1, nMenuSlots)
+#define FValidSlotMacro(n) FBetween(n, 1, cszMacro+1)
 #define FValidList(n) FBetween(n, 0, is.cci-1)
 #define FValidGlyphs(n) FBetween(n, 0, 223222)
 #define FValidDecaType(n) FBetween(n, 0, 2)
