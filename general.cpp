@@ -53,6 +53,7 @@
 
 #include "astrolog.h"
 #include "stdarg.h"
+#include <string.h>
 
 // TODO: get rid of P_ALLOCATE_COPY, either use it or don't use it
 #define P_ALLOCATE_COPY
@@ -2428,6 +2429,7 @@ void DeallocateChartComments()
 //          }
 // Maintain a growable range of sz.
 // Add a new string at slot 'i'. Free any previous string in that slot.
+// If there's an error, then previous defn is cleared.
 flag SetSlotSz(int i, char *sz, char ***prgsz, int *pcsz, int cMinIndex,
                CONST char *szType)
 {
@@ -2436,14 +2438,18 @@ flag SetSlotSz(int i, char *sz, char ***prgsz, int *pcsz, int cMinIndex,
   char **rgsz = *prgsz;
   if (rgsz[i] != NULL)
     DeallocateP(rgsz[i]);
+  if (sz == NULL)
+    rgsz[i] = NULL;
+  else {
 #ifdef P_ALLOCATE_COPY
-  if ((rgsz[i] = (char*)PAllocateCopy((pbyte)sz, CchSz(sz)+1, szType)) == NULL)
-    return fFalse;
+    if ((rgsz[i]=(char*)PAllocateCopy((pbyte)sz, CchSz(sz)+1, szType)) == NULL)
+      return fFalse;
 #else
-  if ((rgsz[i] = SzCopy(sz)) == NULL)
-    return fFalse;
-  is.cAlloc++; // SzPersist assumes forever, but it will be freed
+    if ((rgsz[i] = SzCopy(sz)) == NULL)
+      return fFalse;
+    is.cAlloc++; // SzPersist assumes forever, but it will be freed
 #endif
+  }
   return fTrue;
 }
 
@@ -2482,15 +2488,65 @@ void DeallocateSlots(char ***prgsz, int *pcsz)
   *pcsz = 0;
 }
 
-// Add a new macro at slot 'i'.
-flag SetMacro(int i, char *sz)
+// Return index of MacroName, less than zero if not found.
+static int iSearchMacroName(char *szMacroName)
 {
-  return SetSlotSz(i, sz, &szMacro, &cszMacro, nMenuSlots - 1, "Macro Slots");
+  int i = cszMacroName - 1;
+  // FEqRgch doesn't seem like it work to detect two identical strings
+  // since specified range does not include zero terminator.
+  char **psz = &rgszMacroName[i];
+  for (; i >= 0; --i, --psz)
+    if (*psz != NULL && strcmp(szMacroName, *psz) == 0)
+      break;
+  return i;
+}
+
+// Add a new macro at slot 'i'.
+// Record the optional MacroName.
+// Previous slot, if any, of old MacroName is cleared.
+// Note that if error, previous info is wiped out.
+flag SetMacro(int i, char *szNewMacro, char *szNewMacroName)
+{
+  // Remove the MacroName from previous assignment
+  if (szNewMacroName != NULL) {
+    int j = iSearchMacroName(szNewMacroName);
+    if (j >= 0) {
+      SetSlotSz(j, NULL, &rgszMacroName, &cszMacroName,
+                nMenuSlots - 1, "MacroName Slots");
+    }
+  }
+  flag fOk = SetSlotSz(i, szNewMacro, &szMacro, &cszMacro, nMenuSlots - 1,
+                       "Macro Slots");
+  if (!fOk)
+    szNewMacroName = NULL;
+  flag fOk2 = SetSlotSz(i, szNewMacroName, &rgszMacroName, &cszMacroName,
+                        nMenuSlots - 1, "MacroName Slots");
+  if (fOk && !fOk2)
+    SetSlotSz(i, NULL, &szMacro, &cszMacro, nMenuSlots - 1, "Macro Slots");
+  return fOk && fOk2;
+}
+
+// Arg is either macro number or macro name.
+// Return index of the macro, less than zero if error.
+// TODO: Could use a hash table, rather than linear search for MacroName.
+int iGetMacro(char *arg)
+{
+  flag fName = !FNumCh(*arg);
+  int i;
+  if (FNumCh(*arg)) {
+    i = NFromSz(arg);
+    i--;
+  } else
+    i = iSearchMacroName(arg);
+  if (FErrorValN("M", !FValidSlotMacro(i+1), i, 1))
+    return -1;
+  return i;
 }
 
 void DeallocateMacros()
 {
   DeallocateSlots(&szMacro, &cszMacro);
+  DeallocateSlots(&rgszMacroName, &cszMacroName);
 }
 
 

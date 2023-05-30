@@ -191,6 +191,8 @@ GridInfo *grid = NULL;
 int rgobjList[objMax], rgobjList2[objMax], starname[cStar+1], kObjA[objMax];
 char **szMacro, *szWheel[cRing+1] = {"", "", "", "", "", "", ""};
 int cszMacro;
+char ** rgszMacroName;
+int cszMacroName;
 real rStarBrightDef[cStar+1] = {-1.0}, rStarBright[cStar+1],
   rStarBrightDistDef[cStar+1];
 char *szStarCustom[cStar+1];

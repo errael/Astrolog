@@ -1281,14 +1281,22 @@ flag FProcessSwitches(int argc, char **argv)
         break;
       }
       i = (ch1 == '0');
-      if (FErrorArgc("M", argc, 1+i))
-        return fFalse;
-      j = NFromSz(argv[1]);
-      j--;
-      if (i && j >= 0)
-        SetMacro(j, argv[2]);
-      else {
-        if (FErrorValN("M", !FValidSlotMacro(j+1), j, 1))
+      // TODO: could simplify here by pushing some of the logic
+      //       into SetMacro(argc, argv).
+      if (i) {
+        flag fName = argv[1] != NULL && !FNumCh(argv[1][0]);
+        i += fName;
+        if (FErrorArgc("M0", argc, 1 + i))
+          return fFalse;
+        j = NFromSz(argv[1 + fName]);
+        j--;
+        if (FErrorValN("M0", j < 0, j, 1 + fName))
+            return fFalse;
+        SetMacro(j, argv[2 + fName], fName ? argv[1] : NULL);
+      } else {
+        if (FErrorArgc("M", argc, 1))
+          return fFalse;
+        if ((j = iGetMacro(argv[1])) < 0)
           return fFalse;
         FProcessCommandLine(szMacro[j]);
       }

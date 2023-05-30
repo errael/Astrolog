@@ -226,6 +226,8 @@ extern CONST AI ai[cPart];
 
 extern char **szMacro, *szWheel[cRing+1];
 extern int cszMacro;
+extern char **rgszMacroName;
+extern int cszMacroName;
 extern CONST char *szColor[cColor+4], *szColorHTML[cColor];
 
 extern int rgObjRay[oNorm+1], rgSignRay[cSign+1], rgSignRay2[cSign+1][cRay+1],
@@ -347,7 +349,8 @@ extern flag FAppendCIList P((CONST CI *));
 extern flag FSortCIList P((int));
 extern void FilterCIList P((CONST char *, CONST char *));
 extern flag FEnumerateCIList P((int));
-extern flag SetMacro P((int, char*));
+extern flag SetMacro P((int, char*, char*));
+extern int iGetMacro P((char*));
 extern void DeallocateMacros();
 extern void AllocateChartComments P((char **, int));
 extern void DeallocateChartComments();

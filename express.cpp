@@ -1943,6 +1943,30 @@ CONST char *PchGetParameter(CONST char *pchCur, PAR *rgpar, int ifun,
     }
   }
 
+// NOTE: easiest to check for switch <name> before checking for named constants,
+//       at least for now, since the "_" in the 2nd position of the string
+//       is magic like: "O_Moon", "K_Mag" (see "~kA <string>").
+//       I'm using prefix "m_" for named macros, and the "_" matches the
+//       "named constant" prefix. But that doesn't really matter, since
+//       a macro name shouldn't be a magic name, but this way there's
+//       no need to check. A magic name would work (I think) but should be
+//       forbidden.
+//       For some generality might change param type to 3 bits and ...
+// TODO: Put this after "Check for named constants.". First need to fix
+//       that check because currently if a name has "_" in the second spot,
+//       then it will "succeed" even if it doesn't match anything.
+  if (ifun == funSwitch && (FCapCh(ch1) || FUncapCh(ch1))) {
+    for (pchT = pchParam, n = 0; *pchT && *pchT > ' '; pchT++, n++)
+      szT[n] = *pchT;
+    szT[n] = chNull;
+    n = iGetMacro(szT);
+    if (n >= 0) {
+      rgpar[0].n = n + 1;
+      rgpar[0].fReal = fFalse;
+      goto LDone;
+    }
+  }
+
   // Check for named constants.
   if (ch1 != chNull && pchParam[1] == '_') {
     for (pchT = pchParam+2, n = 0; *pchT && *pchT > ' '; pchT++, n++)
