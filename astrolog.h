@@ -506,7 +506,7 @@
 #define szObjUnknown  "???"
 
 #define cchSzDef   80
-#define cchSzMax   255
+#define cchSzMax   1023
 #define cchSzLine  (cchSzMax*4)
 #define dwCanary   0x87654321
 #define nDegMax    360
@@ -1296,7 +1296,7 @@ enum _terminationcode {
 #define FValidBioday(n) FBetween(n, 1, 199)
 #define FValidScreen(n) FBetween(n, 20, 200)
 #define FValidMenuMacro(n) FBetween(n, 1, nMenuSlots)
-#define FValidSlotMacro(n) FBetween(n, 1, cszMacro+1)
+#define FValidSlotMacro(n) FBetween(n, 1, cszMacro)
 #define FValidList(n) FBetween(n, 0, is.cci-1)
 #define FValidGlyphs(n) FBetween(n, 0, 223222)
 #define FValidDecaType(n) FBetween(n, 0, 2)
