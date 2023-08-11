@@ -2538,8 +2538,8 @@ int iGetMacro(char *arg)
     i--;
   } else
     i = iSearchMacroName(arg);
-  if (FErrorValN("M", !FValidSlotMacro(i+1), i, 1))
-    return -1;
+  //if (FErrorValN("M", !FValidSlotMacro(i+1), i, 1))
+  //  return -1;
   return i;
 }
 
