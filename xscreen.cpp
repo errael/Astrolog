@@ -1353,6 +1353,11 @@ void InteractX()
             fBreak = fTrue;
             break;
           default:
+            if (key < 0) {
+                // invalid key, do work just in case
+                fResize = fCast = fTrue;
+                break;
+            }
             if (FBetween(key, '1', '9')) {
               // Process numbers 1-9 signifying animation rate.
               gi.nDir = (gi.nDir > 0 ? 1 : -1)*(key-'0');
