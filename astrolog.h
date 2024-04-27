@@ -479,7 +479,7 @@
 #define szObjUnknown  "???"
 
 #define cchSzDef  80
-#define cchSzMax  255
+#define cchSzMax  1023
 #define cchSzLine (cchSzMax*4)
 #define dwCanary  0x87654321
 #define nDegMax   360
