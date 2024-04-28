@@ -75,8 +75,7 @@ void DrawColor(KI col)
       if (gi.kiCur != col) {
         PsStrokeForce();      // Render existing path with current color
         fprintf(gi.file, "%.2f %.2f %.2f c\n",
-          (real)RgbR(rgbbmp[col])/255.0, (real)RgbG(rgbbmp[col])/255.0,
-          (real)RgbB(rgbbmp[col])/255.0);
+          RgbR01(rgbbmp[col]), RgbG01(rgbbmp[col]), RgbB01(rgbbmp[col]));
       }
     }
 #endif
@@ -399,10 +398,12 @@ void AdjustGlyph(int *ch, int *x, int *y, int *fi, int *nScale,
 #endif
 
 
-#ifdef WINANY
+// DrawGlyph is always defined; it may do nothing and always return false.
+
 // Draw an astrology character from a special font on the screen. Used to draw
 // sign, planet, aspect, and Nakshatra glyphs from these fonts within charts.
 
+#ifdef WINANY
 flag DrawGlyph(int ch, int x, int y, int fi, int nScale)
 {
   HFONT hfont, hfontPrev;
@@ -444,7 +445,124 @@ flag DrawGlyph(int ch, int x, int y, int fi, int nScale)
   return fTrue;
 }
 
+#else // WINANY
 
+#ifdef X11
+#ifdef XCAIRO
+//#define XCAIRO_DEBUG
+#ifdef XCAIRO_DEBUG
+flag FFontInstalled(int);
+#endif
+
+flag DrawGlyph(int ch, int x, int y, int fi, int nScale)
+{
+  // NOTE: ignore windows SetBkMode, DEFAULT_CHARSET, fi == fiArial && ch < 0
+
+  // Fonts: 1=Wingdings, 2=Astro, 3=EnigmaAstrology, 4=HamburgSymbols,
+  // 5=Astronomicon, 6=Courier New, 7=Consolas, 8=Arial, 9=HanksNakshatra
+
+#ifdef XCAIRO_DEBUG
+  if(!FFontInstalled(fi))
+      return fFalse;
+#endif
+
+  char symbol[4];
+  WchToUTF8(ch & 0xff, symbol);
+
+  // save current font, set new font; same thing with color.
+  cairo_font_face_t *fontPrev = cairo_get_font_face(gi.cr);
+  cairo_font_face_reference(fontPrev);
+  cairo_select_font_face (gi.cr, rgszFontName[fi],
+                          CAIRO_FONT_SLANT_NORMAL,
+                          gs.fThick ? CAIRO_FONT_WEIGHT_BOLD
+                                : CAIRO_FONT_WEIGHT_NORMAL);
+  cairo_set_font_size(gi.cr, 12*gi.nScale*nScale/100); // height
+  double r,g,b,a;
+  cairo_pattern_get_rgba(cairo_get_source(gi.cr), &r, &g, &b, &a);
+  int rgb = rgbbmp[gi.kiCur];
+  cairo_set_source_rgb(gi.cr, RgbR01(rgb), RgbG01(rgb), RgbB01(rgb));
+
+  // Center the text/symbol on the the given x,y position
+  cairo_text_extents_t extents;
+  cairo_text_extents (gi.cr, symbol, &extents);
+  double xAdj = x - (extents.width/2 + extents.x_bearing);
+  double yAdj = y - (extents.height/2 + extents.y_bearing);
+  cairo_move_to (gi.cr, xAdj, yAdj);
+  cairo_show_text (gi.cr, symbol);
+
+  cairo_set_source_rgba(gi.cr, r, g, b, a);
+  cairo_set_font_face(gi.cr, fontPrev);
+  cairo_font_face_destroy(fontPrev);
+  return fTrue;
+}
+#else // XCAIRO
+// X11, but no XCAIRO so create "no-op" DrawGlyph
+flag DrawGlyph(int ch, int x, int y, int fi, int nScale)
+{
+  return fFalse;
+}
+#endif // XCAIRO
+
+#else // X11
+// Neither WINANY nor X11 defined so create "no-op" DrawGlyph
+flag DrawGlyph(int ch, int x, int y, int fi, int nScale)
+{
+  return fFalse;
+}
+#endif // X11
+#endif // WINANY,X11
+
+#ifdef XCAIRO_DEBUG
+// Build a list of installed fonts that astrolog cares about.
+#include <string.h>
+#include <fontconfig/fontconfig.h>
+// If XCAIRO_DEBUG is enabled, use "-lfontconfig" when linking.
+// If -lcairo works, then I'm *pretty sure* fontconfig is available.
+// NOTE: have no idea of the "right" way to use fontconfig library.
+
+// Keep an array of available fonts; indexed by _fontindex.
+static bool *font_avail;
+static void initFontAvail()
+{
+    if(font_avail != NULL)
+        return;
+    font_avail = (bool*)calloc(sizeof(bool), cFont);
+
+    FcConfig *config = FcInitLoadConfigAndFonts();
+    font_avail[fiAstrolog] = true;
+    FcResult fcr;
+    FcBool fcb;
+    int i;
+    for(i = 1; i < cFont; i++) {
+        FcPattern *checkpat = FcPatternBuild (0, FC_FAMILY, FcTypeString,
+                                              rgszFontName[i], (char *) 0);
+        // Don't understand the next two lines, but the docs are insistent.
+        FcDefaultSubstitute(checkpat);
+        FcConfigSubstitute(config, checkpat, FcMatchFont);
+        FcPattern *pat = FcFontMatch(config, checkpat, &fcr);
+        FcChar8 *family;
+        fcb = FcPatternGetString(pat, FC_FAMILY, 0, &family);
+        if(!(fcb || fcr))
+            font_avail[i] = strcmp(rgszFontName[i], (char*)family) == 0;
+    }
+#ifdef NOT_DEF
+    // TODO: option to display available fonts
+    for(i = 0; i < cFont; i++)
+        fprintf(stderr, "font %d: %d - '%s'\n",
+                i, font_avail[i], rgszFontName[i]);
+#endif
+}
+
+// Used by DrawGlyph for early return if font not available.
+flag FFontInstalled(int fi)
+{
+    if(!font_avail)
+        initFontAvail();
+    return font_avail[fi];
+}
+#endif // XCAIRO_DEBUG
+
+#ifdef WINANY
 // Clear and erase the entire graphics screen on Windows.
 
 void WinClearScreen(KI ki)
@@ -1242,12 +1360,10 @@ void DrawSign(int i, int x, int y)
   fDoThin = gs.fThick && nFont == 0 && ch <= 0 && gi.nScale <= gi.nScaleT;
   if (fDoThin)
     DrawThick(fFalse);
-#ifdef WINANY
   if (!gi.fFile && ch > 0) {
     if (DrawGlyph(ch, x, y, nFont, nScale))
       return;
   }
-#endif
 #ifdef PS
   if (gs.ft == ftPS && nFont > 0 && ch > 0) {
     PsFont(nFont);
@@ -1303,7 +1419,7 @@ void DrawHouse(int i, int x, int y)
   fDoThin = gs.fThick && nFont == 0 && ch <= 0 && gi.nScale <= gi.nScaleT;
   if (fDoThin)
     DrawThick(fFalse);
-#ifdef WINANY
+#ifdef ISG
   if (!gi.fFile && ch > 0) {
     if (nFont == fiArial)
       ch = (i <= 9 ? '0' + i : -i);
@@ -1445,12 +1561,10 @@ void DrawObject(int obj, int x, int y)
   fDoThin = gs.fThick && nFont == 0 && ch <= 0 && gi.nScale <= gi.nScaleT;
   if (fDoThin)
     DrawThick(fFalse);
-#ifdef WINANY
   if (!gi.fFile && ch > 0) {
     if (DrawGlyph(ch, x, y, nFont, nScale))
       return;
   }
-#endif
 #ifdef PS
   if (gs.ft == ftPS && nFont > 0 && ch > 0) {
     PsFont(nFont);
@@ -1645,12 +1759,10 @@ void DrawAspect(int asp, int x, int y)
   fDoThin = gs.fThick && nFont == 0 && ch <= 0 && gi.nScale <= gi.nScaleT;
   if (fDoThin)
     DrawThick(fFalse);
-#ifdef WINANY
   if (!gi.fFile && ch > 0) {
     if (DrawGlyph(ch, x, y, nFont, nScale))
       return;
   }
-#endif
 #ifdef PS
   if (gs.ft == ftPS && nFont > 0 && ch > 0) {
     PsFont(nFont);
@@ -1703,12 +1815,10 @@ void DrawNakshatra(int i, int x, int y)
   fDoThin = gs.fThick && nFont == 0 && ch <= 0 && gi.nScale <= gi.nScaleT;
   if (fDoThin)
     DrawThick(fFalse);
-#ifdef WINANY
   if (!gi.fFile && ch != -1) {
     if (DrawGlyph(ch, x, y, nFont, nScale))
       return;
   }
-#endif
 #ifdef PS
   if (gs.ft == ftPS && nFont > 0 && ch > 0) {
     PsFont(nFont);

@@ -62,6 +62,9 @@
 */
 
 #ifdef X11
+#include  <unistd.h>
+#include <X11/Xatom.h>
+
 // This information used to define Astrolog's X Windows icon (ringed planet
 // with moons) is similar to the output format used by the bitmap program.
 // You could extract this section and run "xsetroot -bitmap" on it.
@@ -316,6 +319,25 @@ LRESULT API WndProcWCLI(HWND hwnd, UINT wMsg, WPARAM wParam, LPARAM lParam)
 #endif
 
 
+#ifdef X11
+Pixmap CreatePixmap(Display *display, Drawable d,
+                    unsigned int width, unsigned int height, unsigned int depth)
+{
+  Pixmap pixmap = XCreatePixmap(display, d, width, height, depth);
+#ifdef XCAIRO
+  if(gi.cr)
+    cairo_destroy(gi.cr);
+  cairo_surface_t *sfc;
+  sfc = cairo_xlib_surface_create(display, pixmap,
+                                  DefaultVisual(display, gi.screen),
+                                  width, height);
+  gi.cr = cairo_create(sfc);
+  cairo_surface_destroy(sfc);
+#endif
+  return pixmap;
+}
+#endif // X11
+
 #ifdef ISG
 // This routine opens up and initializes a window and prepares it to be drawn
 // upon, and gets various information about the display, too.
@@ -348,7 +370,7 @@ void BeginX()
   else
     gi.wind = XCreateSimpleWindow(gi.disp, DefaultRootWindow(gi.disp),
       hint.x, hint.y, hint.width, hint.height, 5, fg, bg);
-  gi.pmap = XCreatePixmap(gi.disp, gi.wind, gs.xWin, gs.yWin, gi.depth);
+  gi.pmap = CreatePixmap(gi.disp, gi.wind, gs.xWin, gs.yWin, gi.depth);
   gi.icon = XCreateBitmapFromData(gi.disp, DefaultRootWindow(gi.disp),
     (char *)icon_bits, icon_width, icon_height);
   if (!gs.fRoot)
@@ -706,7 +728,7 @@ void InteractX()
 #ifdef X11
       XResizeWindow(gi.disp, gi.wind, gs.xWin, gs.yWin);
       XFreePixmap(gi.disp, gi.pmap);
-      gi.pmap = XCreatePixmap(gi.disp, gi.wind, gs.xWin, gs.yWin, gi.depth);
+      gi.pmap = CreatePixmap(gi.disp, gi.wind, gs.xWin, gs.yWin, gi.depth);
 #endif
 #ifdef WCLI
       ResizeWindowToChart();
@@ -806,7 +828,7 @@ void InteractX()
         gi.xWinResize = gs.xWin = xevent.xconfigure.width;
         gi.yWinResize = gs.yWin = xevent.xconfigure.height;
         XFreePixmap(gi.disp, gi.pmap);
-        gi.pmap = XCreatePixmap(gi.disp, gi.wind, gs.xWin, gs.yWin, gi.depth);
+        gi.pmap = CreatePixmap(gi.disp, gi.wind, gs.xWin, gs.yWin, gi.depth);
         fRedraw = fTrue;
         break;
       case MappingNotify:
@@ -1244,6 +1266,9 @@ void EndX()
 #ifdef X11
   XFreeGC(gi.disp, gi.gc);
   XFreeGC(gi.disp, gi.pmgc);
+#ifdef XCAIRO
+  cairo_destroy(gi.cr);
+#endif
   XFreePixmap(gi.disp, gi.pmap);
   XDestroyWindow(gi.disp, gi.wind);
   XCloseDisplay(gi.disp);
@@ -1252,8 +1277,9 @@ void EndX()
   UnregisterClass(szAppName, wi.hinst);
 #endif
 }
-#endif // ISG
+
 #endif // WIN
+#endif // ISG
 
 
 /*
