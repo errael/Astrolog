@@ -61,6 +61,7 @@
 ******************************************************************************
 */
 
+#include <string.h>
 #ifdef X11
 #include <unistd.h>
 #include <sys/time.h>
@@ -545,10 +546,13 @@ LNotNow:
 
 
 #ifndef WIN
+
 // This routine exits graphics mode, prompts the user for a set of command
 // switches, processes them, and returns to the previous graphics with the
 // new settings in effect, allowing one to change most any setting without
 // having to lose their graphics state or fall way back to a -Q loop.
+
+static void finishCommandLineX(int, char *[], int, int);
 
 void CommandLineX()
 {
@@ -558,9 +562,16 @@ void CommandLineX()
   ciCore = ciMain;
   fT = us.fLoop; us.fLoop = fTrue;
   argc = NPromptSwitches(szCommandLine, rgsz);
+  finishCommandLineX(argc, rgsz, fT, fPause);
+}
+
+// For input line or macro
+static void finishCommandLineX(int argc, char *argv[MAXSWITCHES],
+                               int fT, int fPause)
+{
   is.cchRow = 0;
   is.fSzInteract = fTrue;
-  if (!FProcessSwitches(argc, rgsz))
+  if (!FProcessSwitches(argc, argv))
     fPause = fTrue;
   else {
     is.fMult = fFalse;
@@ -576,6 +587,25 @@ void CommandLineX()
   us.fLoop = fT;
   ciMain = ciCore;
   InitColorsX();
+}
+
+// TODO: fPause is NOT USED
+
+// Treats a macro like a commandLine for processing.
+// TODO: use malloc rather than char array on stack?
+static void ProcessMacro(char *macro)
+{
+  char szCommandLine[cchSzMax], *rgsz[MAXSWITCHES];
+  int argc, fT, fPause = fFalse;
+
+  if(strlen(macro) + 1 > sizeof(szCommandLine))
+    return;
+  strcpy(szCommandLine, macro);
+
+  ciCore = ciMain;
+  fT = us.fLoop; us.fLoop = fTrue;
+  argc = NParseCommandLine(szCommandLine, rgsz);
+  finishCommandLineX(argc, rgsz, fT, fPause);
 }
 #endif // WIN
 
@@ -926,9 +956,33 @@ void InteractX()
 
       // Process any keys user pressed in window.
       case KeyPress:
-        length = XLookupString((XKeyEvent *)&xevent, xkey, 10, &keysym, 0);
-        if (length == 1) {
-          key = xkey[0];
+        {
+          XKeyEvent *kev = (XKeyEvent *)&xevent;
+          length = XLookupString(kev, xkey, 10, &keysym, NULL);
+          key = length == 1 ? xkey[0] : keysym;
+#ifdef LOGIT
+          logit("KeyPress: key %x: '%c' (0x%x),"
+                " sym: '%s' (0x%08x), state: 0x%x, len: %d",
+                key, xkey[0] >= ' ' ? xkey[0] : 0, xkey[0],
+                XKeysymToString(keysym), keysym, kev->state, length);
+#endif
+          if(FBetween(key, XK_F1, XK_F12)) {
+              // Put key in range funcKeyFirst:funcKeyLast inclusive.
+              // Account for shift(+12)/control(+24)/alt(+36).
+              int fkey = key - XK_F1;
+              if((kev->state & ShiftMask) != 0)
+                  fkey += 12;
+              else if((kev->state & ControlMask) != 0)
+                  fkey += 24;
+              else if((kev->state & Mod1Mask) != 0)
+                  fkey += 36;
+              key = funcKeyFirst + fkey;
+#ifdef LOGIT
+              logit("MapFuncKey: fkey(+1) %d, key %d", fkey + 1, key);
+#endif
+          }
+        }
+        if (!IsModifierKey(keysym)) {
 #endif // X11
 
 #ifdef WCLI
@@ -958,9 +1012,23 @@ void InteractX()
 #ifdef EXPRESS
           // May want to adjust current key if AstroExpression says to do so.
           if (!us.fExpOff && FSzSet(us.szExpKey)) {
+#ifdef LOGIT
+            int tkey = key;
+#endif
             ExpSetN(iLetterZ, key);
             ParseExpression(us.szExpKey);
             key = NExpGet(iLetterZ);
+#ifdef LOGIT
+            if(key != tkey) logit("origKey %d, newKey %d", tkey, key);
+#endif
+#if 0
+            if(key < 0) {
+                // ~XQ set @z to a negative number, no key processing.
+                // Anything may have happened; do work; wait for another event.
+                //fResize = fCast = fTrue;
+                continue;
+            }
+#endif
           }
 #endif
           switch (key) {
@@ -1296,13 +1364,16 @@ void InteractX()
               // Process numbers 1-9 signifying animation rate.
               gi.nDir = (gi.nDir > 0 ? 1 : -1)*(key-'0');
               break;
-            } else if (FBetween(key, 201, 248)) {
-              is.fSzInteract = fTrue;
-              if (is.rgszMacro != NULL && is.rgszMacro[key-200]) {
-                FProcessCommandLine(is.rgszMacro[key-200]);
+            } else if (FBetween(key, funcKeyFirst, funcKeyLast)) {
+              int m = key-funcKeyFirst+1;
+#ifdef LOGIT
+              logit("key: %d, RunSwitch %d: %s",
+                    key, m, is.rgszMacro[m] ? is.rgszMacro[m] : "null");
+#endif
+              if (is.rgszMacro != NULL && is.rgszMacro[m]) {
+                ProcessMacro(is.rgszMacro[m]);
                 fResize = fCast = fTrue;
               }
-              is.fSzInteract = fFalse;
               break;
             }
             // Any key not bound, or empty macro, will sound a beep.
@@ -1317,7 +1388,7 @@ void InteractX()
       } // if(PeekMessage())
 #endif
 #ifdef X11
-        } // case KeyPress: ... if(length == 1)
+        } // case KeyPress: ... if(!IsModifier(keysym))
       default:
         ;
       } // switch (xevent.type) {

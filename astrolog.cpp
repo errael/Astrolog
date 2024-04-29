@@ -1308,10 +1308,17 @@ flag FProcessSwitches(int argc, char **argv)
       if (FErrorValN("M", !FValidMacro(j), j, 1))
         return fFalse;
       if (i) {
+#ifdef LOGIT
+        logit("DefineSwitch %d: %s", j, argv[2]);
+#endif
         if (FEnsureMacro(j+1))
           FCloneSz(argv[2], &is.rgszMacro[j]);
-      } else if (j < is.cszMacro)
+      } else if (j < is.cszMacro) {
+#ifdef LOGIT
+        logit("RunSwitch M-%d: %s", j, is.rgszMacro[j] ? is.rgszMacro[j] : "null");
+#endif
         FProcessCommandLine(is.rgszMacro[j]);
+      }
       argc -= 1+i; argv += 1+i;
       break;
 
