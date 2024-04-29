@@ -52,6 +52,7 @@
 */
 
 #include "astrolog.h"
+#include "stdarg.h"
 
 
 /*

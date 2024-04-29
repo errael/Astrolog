@@ -95,7 +95,10 @@ GI gi = {
   fFalse, 1, DEFAULTX, DEFAULTY,
 #endif
 #ifdef X11
-  NULL, 0, 0, 0, 0, 0, 0, 0, 0,
+  NULL, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1,
+#ifdef XSELTIME
+  1000, 0, 0,
+#endif
 #ifdef XCAIRO
   NULL,
 #endif

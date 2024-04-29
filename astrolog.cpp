@@ -2749,14 +2749,12 @@ flag FProcessSwitches(int argc, char **argv)
       argc -= i; argv += i;
       break;
 
-#ifdef WIN
     case 'W':
       i = NProcessSwitchesW(argc, argv, ich, fOr, fAnd, fNot);
       if (i < 0)
         return fFalse;
       argc -= i; argv += i;
       break;
-#endif
 #endif // GRAPH
 
     case '0':

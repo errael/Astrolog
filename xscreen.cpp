@@ -62,7 +62,8 @@
 */
 
 #ifdef X11
-#include  <unistd.h>
+#include <unistd.h>
+#include <sys/time.h>
 #include <X11/Xatom.h>
 
 // This information used to define Astrolog's X Windows icon (ringed planet
@@ -92,6 +93,13 @@ CONST uchar icon_bits[] = {
   0x00,0xf8,0x79,0x00,0x00,0x00,0x00,0xf0,0x7f,0x00,0x00,0x20,0x00,0xc0,0xff,
   0x00,0x00,0x00,0x00,0x82,0xff,0x00,0x00,0x00,0x00,0x00,0xfe,0x40,0x00,0x00,
   0x00,0x00,0x70};
+
+#ifdef XSELTIME
+// would be nice to use timeradd(3)
+#define MSEC_SEC     1000
+#define USEC_SEC  1000000
+#define USEC_MSEC    1000
+#endif
 #endif
 
 
@@ -336,6 +344,20 @@ Pixmap CreatePixmap(Display *display, Drawable d,
 #endif
   return pixmap;
 }
+
+// The NET_WM_PID property assists usage with xdotool...
+// Could move "SETUP_NET_WM_PID_PROPERTY" to astrolog.h for optional control.
+#define SETUP_NET_WM_PID_PROPERTY
+
+#ifdef SETUP_NET_WM_PID_PROPERTY
+enum {
+    ATOM__NET_WM_PID,
+    ATOM_COUNT
+};
+static Atom atoms[ATOM_COUNT];
+#define INIT_ATOM_(atom) \
+            atoms[ATOM_##atom] = XInternAtom(gi.disp, #atom, False);
+#endif // SETUP_NET_WM_PID_PROPERTY
 #endif // X11
 
 #ifdef ISG
@@ -376,6 +398,13 @@ void BeginX()
   if (!gs.fRoot)
     XSetStandardProperties(gi.disp, gi.wind, szAppName, szAppName, gi.icon,
       (char **)xkey, 0, &hint);
+#ifdef SETUP_NET_WM_PID_PROPERTY
+  INIT_ATOM_(_NET_WM_PID);
+  pid_t pid = getpid();
+  XChangeProperty(gi.disp, gi.wind,
+                  atoms[ATOM__NET_WM_PID], XA_CARDINAL, sizeof(pid_t) * 8,
+                  PropModeReplace, (unsigned char *) &pid, 1);
+#endif
 
   // There are two graphics workareas. One is what the user currently sees in
   // the window, and the other is what is currently being drawn on. When done,
@@ -623,6 +652,11 @@ void InteractX()
   char sz[cchSzDef];
   XEvent xevent;
   KeySym keysym;
+  gi.x11_fd = ConnectionNumber(gi.disp);
+  if(gi.initx != -1) {
+    XMoveWindow(gi.disp, gi.wind, gi.initx, gi.inity);
+    gi.initx = -1;
+  }
 #endif
 #ifdef WCLI
   HBITMAP hbmp, hbmpOld;
@@ -806,13 +840,37 @@ void InteractX()
       if (!us.fExpOff && FSzSet(us.szExpDisp3))
         ParseExpression(us.szExpDisp3);
 #endif
-    } // if
+    } // if (fRedraw && (!gi.fPause || gs.nAnim)) {
 
     // Now process what's on the event queue, i.e. any keys pressed, etc.
 
 #ifdef X11
-    if (XEventsQueued(gi.disp, QueuedAfterFlush /*QueuedAfterReading*/) ||
-      !gs.nAnim || gi.fPause) {
+#ifdef XSELTIME
+    if(!XEventsQueued(gi.disp, QueuedAfterFlush)) {
+        // wait for next X event, with timeout if animating
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(gi.x11_fd, &readfds);
+        struct timeval *p_tv = nullptr; // assume not animating
+        struct timeval tv;
+        if(gs.nAnim && !gi.fPause) {
+            // Calculate the next timeout for animation.
+            // TODO: adjust time so that average timeout is specified time.
+            tv.tv_sec = gi.nTimerDelay / MSEC_SEC;
+            tv.tv_usec = (gi.nTimerDelay % MSEC_SEC) * USEC_MSEC;
+            p_tv = &tv;
+        }
+        int n_ready = select(gi.x11_fd + 1, &readfds, nullptr, nullptr, p_tv);
+        if(n_ready == 0) {
+            // no-events/timeout, let the animation step happen.
+            continue;
+        }
+    }
+#else
+    if (XEventsQueued(gi.disp, QueuedAfterFlush /*QueuedAfterReading*/)
+        || !gs.nAnim || gi.fPause)
+#endif
+    {
       XNextEvent(gi.disp, &xevent);
 
       // Restore what's on window if a part of it gets uncovered.
@@ -1207,7 +1265,11 @@ void InteractX()
             CommandLineX();
             fResize = fCast = fTrue;
             break;
+#ifdef X11
+          case 0x7f:
+#else
           case chDelete:
+#endif
             fRedraw = fNoChart = fTrue;
             break;
           case 'z'-'`': coldrw = kBlack;   break;
@@ -1243,19 +1305,25 @@ void InteractX()
               is.fSzInteract = fFalse;
               break;
             }
-            putchar(chBell);    // Any key not bound will sound a beep.
-          } // switch
-        } // if
+            // Any key not bound, or empty macro, will sound a beep.
 #ifdef X11
+            XBell(gi.disp, 0);
+#else
+            putchar(chBell);
+#endif
+          } // switch (key)
+#ifdef WCLI
+        } // if (nMsg != WM_CHAR && nMsg != WM_KEYDOWN) else
+      } // if(PeekMessage())
+#endif
+#ifdef X11
+        } // case KeyPress: ... if(length == 1)
       default:
         ;
-      } // switch
-    } // if
+      } // switch (xevent.type) {
+    } // if(XEventsQueued(...)...)
 #endif
-#ifdef WCLI
-    } // if
-#endif
-  } // while
+  } // while(!fBreak)
 }
 
 
@@ -1726,6 +1794,53 @@ int NProcessSwitchesX(int argc, char **argv, int pos,
   // 'darg' contains the value to be added to argc after returning.
   return darg;
 }
+
+#ifdef X11
+// X11 supports a few of the WIN Options
+int NProcessSwitchesW(int argc, char **argv, int pos,
+  flag fOr, flag fAnd, flag fNot)
+{
+  int darg = 0, xo, yo, i;
+  char sz[cchSzMax], ch1, ch2;
+
+  ch1 = argv[0][pos+1];
+  ch2 = ch1 != chNull ? argv[0][pos+2] : chNull;
+  switch (argv[0][pos]) {
+
+#ifdef XSELTIME
+  case 'N':
+    if (FErrorArgc("WN", argc, 1))
+      return tcError;
+    i = NFromSz(argv[1]);
+    if (FErrorValN("WN", !FValidTimer(i), i, 0))
+      return tcError;
+    gi.nTimerDelay = i;
+    darg++;
+    break;
+#endif
+
+  case 'w':
+    if (FErrorArgc("Ww", argc, 2))
+      return tcError;
+    xo = NFromSz(argv[1]);
+    yo = NFromSz(argv[2]);
+    if(gi.disp != nullptr)
+      XMoveWindow(gi.disp, gi.wind, xo, yo);
+    else {
+      gi.initx = xo;
+      gi.inity = yo;
+    }
+    darg += 2;
+    break;
+
+  default:
+    ErrorSwitch(argv[0]);
+    return tcError;
+  }
+  // 'darg' contains the value to be added to argc when we return.
+  return darg;
+}
+#endif
 
 
 // Process one command line switch passed to the program dealing with more
